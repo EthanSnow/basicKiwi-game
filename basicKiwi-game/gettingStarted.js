@@ -2,6 +2,8 @@ var myGame = new Kiwi.Game()
 var myState = new Kiwi.State( "myState" )
 var Point = new Kiwi.Geom.Point(0,0)
 
+//define
+var toRadians = 180/Math.PI
 
 myState.preload = function(){
   Kiwi.State.prototype.preload.call(this);
@@ -24,10 +26,15 @@ myState.create = function (){
   this.character = new spriteWithPhysics( this, this.textures.creatureSprite,300, 330 );
     this.character.thelabel = "main"
     this.character.geom = new Kiwi.Geom.Circle(this.character.x, this.character.y, 50)
-    this.character.geom = new Kiwi.Geom.Circle(this.character.x, this.character.y, 150)
+    this.character.visionAngle = 0 //just for init
+    this.character.visionLength = 150
+    this.character.checkingAngle = [0,30,180]
+    this.character.geomLine = new Kiwi.Geom.Line(this.character.x, this.character.y,
+                                                 this.character.x+(this.character.visionLength*Math.sin(this.character.visionAngle*toRadians)),
+                                                 this.character.y+(this.character.visionLength*Math.cos(this.character.visionAngle*toRadians)))
     this.character.actions = []
     this.character.events = []
-    this.character.angle = 0
+
     //this.character.todo = checkCollide
   //this.characterVision = new Kiwi.Geom.Circle(100, 100, 10)
     //this.character.physics.velocity.setTo(5,5)
@@ -67,7 +74,7 @@ myState.create = function (){
   //self-executable function
   var enemyToOtherLoc = gemToStone_F(toOtherLoc, this, "enemy")
   var hitWall1_stone = gemToStone_F(hitedwall_x, this.character, this.wall1, this.character)
-    hitWall1_stone =  StoneThenStone(hitWall1_stone, ()=>{this.character.events.push(this.wall1.thelabel);})
+    //hitWall1_stone =  StoneThenStone(hitWall1_stone, ()=>{this.character.events.push(this.wall1.thelabel);})
     //then output info
   var hitWall2_stone = gemToStone_F(hitedwall_y, this.character, this.wall2, this.character)
   var hitWall3_stone = gemToStone_F(hitedwall_x, this.character, this.wall3, this.character)
@@ -80,6 +87,17 @@ myState.create = function (){
   var checkHitWall3_stone = TopazMergeStone(hitWall3_stone, checkCollideForGeoms, this.character.geom, this.wall3.geom)
   var checkHitWall4_stone = TopazMergeStone(hitWall4_stone, checkCollideForGeoms, this.character.geom, this.wall4.geom)
 
+    var changeVisionAngle = () => {
+                                    var index=this.character.checkingAngle.indexOf(this.character.visionAngle);
+                                    if(index>this.character.checkingAngle.length){index=-1;}
+                                    this.character.visionAngle = this.character.checkingAngle[index+1]
+    }
+    var checkHitWall1ForVision = TopazMergeStone(()=>{console.log("YO1");}, checkCollideForGeoms_lineRect,this.character.geomLine, this.wall1.geom)
+    var checkHitWall2ForVision = TopazMergeStone(()=>{console.log("YO2");}, checkCollideForGeoms_lineRect,this.character.geomLine, this.wall2.geom)
+    var checkHitWall3ForVision = TopazMergeStone(()=>{console.log("YO3");}, checkCollideForGeoms_lineRect,this.character.geomLine, this.wall3.geom)
+    var checkHitWall4ForVision = TopazMergeStone(()=>{console.log("YO4");}, checkCollideForGeoms_lineRect,this.character.geomLine, this.wall4.geom)
+  var checkHitWall4ForVision_Group = StoneThenStone(changeVisionAngle,checkHitWall1ForVision, checkHitWall2ForVision, checkHitWall3ForVision, checkHitWall4ForVision)
+
   var checkEnemyHide_stone = TopazMergeStone(enemyToOtherLoc, checkCollideForGeoms, this.character.geom, this.enemy.geom)
 
   var characterHitThings = StoneThenStone(checkHitWall1_stone, checkHitWall2_stone, checkHitWall3_stone, checkHitWall4_stone)
@@ -90,7 +108,7 @@ myState.create = function (){
   this.character.actions.push(characterHitThings)
   this.character.actions.push(checkEnemyHide_stone)
 
-
+  this.character.actions.push(checkHitWall4ForVision_Group)
 
   /*
   checkCollideForCircle.circle = this.character.geom
@@ -168,7 +186,10 @@ actinStack = []
 var updateLoc = function(self){
     var x = self.x
     var y = self.y
+    var lineLength = self.visionLength
+    var lineAngle = self.visionAngle
     self.geom.setTo(x+25, y+25, 50)
+    self.geomLine.setTo(x+25, y+25,x+25+lineLength*Math.sin(lineAngle*toRadians), y+25+lineLength*Math.cos(lineAngle*toRadians))
 }
 var destroy = function(self){
     self.destroy()
@@ -228,10 +249,20 @@ var toOtherLoc = function(self, name){
 }
 
 //=============================================================
-
+//  Is it good that I use factory to generate the two below
 checkCollideForGeoms = function(){
   this.theArray = arguments
   var tmp = Kiwi.Geom.Intersect.circleToRectangle(this.theArray[0], this.theArray[1])
+  if (tmp.result){
+    console.log(this.theArray[0]+" hit "+this.theArray[1]);
+    return true
+  }
+  return false
+}
+
+checkCollideForGeoms_lineRect = function(){
+  this.theArray = arguments
+  var tmp = Kiwi.Geom.Intersect.lineSegmentToRectangle(this.theArray[0], this.theArray[1])
   if (tmp.result){
     console.log(this.theArray[0]+" hit "+this.theArray[1]);
     return true
